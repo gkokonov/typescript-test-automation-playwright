@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Convert evals.json (behavioral eval set) to the trigger-rate format the
-vendored skill-creator harness executes.
+a compatible evaluation harness can execute.
 
 Two instruments, one source of truth:
   - evals.json is the BEHAVIORAL spec (prompt + assertions) — graded by a
     human or an agent walking the assertions.
-  - run_eval.py / run_loop.py (skill-creator) execute TRIGGER evals:
+  - TRIGGER evals use this format:
     [{"query": ..., "should_trigger": bool}] — does the skill fire on the
     prompt at all?
 

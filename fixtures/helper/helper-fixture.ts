@@ -100,7 +100,7 @@ export const test = base.extend<HelperFixtures>({
         // Date.now() only reduces the odds of a name collision (same-ms runs
         // across parallel workers can still collide) — a real fixture should
         // generate its data with a Faker factory (test-data/factories/{area}/).
-        const { body } = await apiRequest({
+        const { status, body } = await apiRequest({
             request,
             method: 'POST',
             url: EXAMPLE_RESOURCE_ENDPOINT,
@@ -109,19 +109,35 @@ export const test = base.extend<HelperFixtures>({
             body: { name: `test-resource-${Date.now()}` },
         });
 
-        // Validate, don't cast -- a shape mismatch fails here, not mid-test.
-        const resource = ResourceResponseSchema.parse(body);
+        if (status < 200 || status >= 300) {
+            throw new Error(`Resource creation failed with status ${status}`);
+        }
+        const id =
+            typeof body === 'object' && body !== null && 'id' in body
+                ? z.string().safeParse(body.id)
+                : undefined;
+        if (!id?.success) {
+            throw new Error(
+                'Created resource has no usable id; manual cleanup may be required'
+            );
+        }
 
-        // ── YIELD: Passes data to the test ───────────────────────────
-        await use(resource);
-
-        // ── TEARDOWN: Runs after the test (even on failure) ──────────
-        await apiRequest({
-            request,
-            method: 'DELETE',
-            url: `${EXAMPLE_RESOURCE_ENDPOINT}/${resource.id}`,
-            baseUrl: process.env.API_URL,
-            headers: process.env.ACCESS_TOKEN,
-        });
+        try {
+            const resource = ResourceResponseSchema.parse(body);
+            await use(resource);
+        } finally {
+            const result = await apiRequest({
+                request,
+                method: 'DELETE',
+                url: `${EXAMPLE_RESOURCE_ENDPOINT}/${id.data}`,
+                baseUrl: process.env.API_URL,
+                headers: process.env.ACCESS_TOKEN,
+            });
+            if (result.status < 200 || result.status >= 300) {
+                throw new Error(
+                    `Resource cleanup failed with status ${result.status}`
+                );
+            }
+        }
     },
 });

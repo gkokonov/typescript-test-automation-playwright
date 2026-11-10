@@ -7,8 +7,6 @@
 #   2. Orphan reference -- references/foo.md exists but no link references it.
 #   3. Broken anchor   -- "references/foo.md#bar" with no matching "## bar" heading.
 #
-# Walks the canonical tree only: .claude/skills/<name>/SKILL.md. The generated
-# .agents/skills tree is a byte-for-byte copy gated by check-skills-sync.sh, so
 # checking it again would only repeat every finding.
 #
 # Semantic drift (a rule contradicted by an example) needs an LLM and is out
@@ -19,7 +17,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILLS_DIR="${REPO_ROOT}/.claude/skills"
+SKILLS_DIR="${REPO_ROOT}/.agents/skills"
 
 if [[ ! -d "${SKILLS_DIR}" ]]; then
     echo "SKIP: ${SKILLS_DIR#"${REPO_ROOT}"/} not present (pruned at init) — nothing to check."

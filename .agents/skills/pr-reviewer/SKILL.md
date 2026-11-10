@@ -7,12 +7,12 @@ description: Use when the user names a branch with any review intent ("review PR
 
 ## Critical
 
-- **Read-only until the report is delivered.** Fixes only when the user asks after reading it; a commit only on explicit approval.
+- **Read-only until the report.** Fix only on request; commit only with explicit approval.
 - **Always the three-dot diff against the remote base** (`git diff "$BASE"...HEAD` with `BASE=origin/<name>`); a two-dot diff reviews commits the author never wrote.
 - **Route every changed path to its skills and read them** before judging; the Constitution applies everywhere.
 - **Run the checks, do not only read**: `scripts/verify-changed.sh` and the affected specs.
 - **The Constitution checklist is a gate before the report**: `scripts/scan-constitution.sh` in this skill's directory, then `references/constitution-checklist.md` with `file:line` evidence; every ❌ is a finding.
-- **Every finding is tied to a rule, a bug or a missing case**; a style opinion without a rule is noise.
+- **Tie findings to a rule, bug or missing case**; omit unsupported style opinions.
 - **Env failures are not branch failures.** A run that dies on a missing env var or token is reported as such; never invent or stub a credential.
 - **A schema loosened to swallow a runtime surprise is a must-fix finding** (`z.strictObject` → `z.object`, `.optional()`, `.nullable()`, `.catchall()`, a widened validator); the sanctioned fix is `test.skip` + `// FIXME`. Never `--approve` or `--request-changes` on the user's behalf.
 

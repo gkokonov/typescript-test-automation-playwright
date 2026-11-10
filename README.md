@@ -174,16 +174,16 @@ npm test
 
 ### What to Keep vs. What to Replace
 
-| Keep As-Is                                                                | Replace With Your App                                   |
-| ------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `fixtures/pom/test-options.ts`                                            | `pages/app/*.page.ts` (your page objects)               |
-| `fixtures/pom/page-object-fixture.ts` (extend it)                         | `tests/app/**/*.spec.ts` (your tests)                   |
-| `fixtures/api/plain-function.ts`                                          | `enums/app/app.ts` (your messages/endpoints)            |
-| `fixtures/api/api-types.ts`                                               | `test-data/static/app/*.ts` (your test data)            |
-| `fixtures/helper/helper-fixture.ts` (extend it)                           | `test-data/factories/app/*.factory.ts` (your factories) |
-| `config/`, `helpers/util/`                                                | `helpers/app/createStorageState.ts` (your auth flow)    |
-| `.claude/skills/` (the AI skills; `.agents/skills/` is generated from it) | `fixtures/api/schemas/app/` (your API schemas)          |
-| `playwright.config.ts` (mostly)                                           | `pages/components/` (your UI components)                |
+| Keep As-Is                                        | Replace With Your App                                   |
+| ------------------------------------------------- | ------------------------------------------------------- |
+| `fixtures/pom/test-options.ts`                    | `pages/app/*.page.ts` (your page objects)               |
+| `fixtures/pom/page-object-fixture.ts` (extend it) | `tests/app/**/*.spec.ts` (your tests)                   |
+| `fixtures/api/plain-function.ts`                  | `enums/app/app.ts` (your messages/endpoints)            |
+| `fixtures/api/api-types.ts`                       | `test-data/static/app/*.ts` (your test data)            |
+| `fixtures/helper/helper-fixture.ts` (extend it)   | `test-data/factories/app/*.factory.ts` (your factories) |
+| `config/`, `helpers/util/`                        | `helpers/app/createStorageState.ts` (your auth flow)    |
+| `.agents/skills/` (the AI skills)                 | `fixtures/api/schemas/app/` (your API schemas)          |
+| `playwright.config.ts` (mostly)                   | `pages/components/` (your UI components)                |
 
 ---
 
@@ -757,20 +757,20 @@ const creds = generateLoginCredentials({ password: 'SpecificPassword123!' });
 
 ### How It Works
 
-1. Two setup projects run before the main tests: `setup-api` (`tests/app/auth-api.setup.ts`) logs in over HTTP and saves the access token to `.auth/app/apiAccessToken.json`; `setup-ui` (`tests/app/auth.setup.ts`) logs in through the browser and saves the storage state
+1. Two setup projects run before the main tests: `setup-api` (`tests/app/auth-api.setup.ts`) saves an API token; `setup-ui` (`tests/app/auth.setup.ts`) saves browser storage state. Each invocation uses its own `.auth/app/<run-id>/` directory.
 2. The `api` project depends on `setup-api` only, so API tests never launch a browser and pass where the UI is unreachable (fresh environments, CI behind bot protection); the `chromium` project depends on both
 3. UI tests use the saved storage state (already authenticated)
 4. Every worker of the `api` project loads the token file into `process.env.ACCESS_TOKEN` before its first test
 
 ### Storage State
 
-The storage state is saved to `.auth/app/appStorageState.json` and includes:
+The storage state is saved to `.auth/app/<run-id>/appStorageState.json` and includes:
 
 - Cookies
 - localStorage data
 - Session information
 
-The access token lives in a separate file because Playwright runs each project in its own worker processes: a `process.env` write made in the setup worker is not visible to other workers, so the setup writes the validated login response to `.auth/app/apiAccessToken.json` and the `apiRequest` fixture file reads it once per worker.
+The access token lives in `.auth/app/<run-id>/apiAccessToken.json` because Playwright runs projects in separate worker processes. Setup publishes the validated response atomically, and consuming workers load it once. Global teardown removes the run's authentication directory after tests finish, including on test failure.
 
 ### Using Authentication in Tests
 
@@ -820,7 +820,7 @@ npm run format
 Husky runs on every commit:
 
 - ESLint with auto-fix (`--max-warnings 0`) and Prettier on the staged TypeScript (lint-staged), then the Constitution scan (`enforce_constitution.py --scan`) over the same files
-- The rule-layer gates (`check:agents-md`, `check:skills-sync`, `check:skills-shape`, `skills:verify`, `check:skills-drift`, `check:skills-references`, `check:skills-headings`, `check:skills-crossrefs`) -- only when `AGENTS.md`, `CLAUDE.md`, `AI-WORKFLOWS.md`, a skill tree, the rule manifest, `skills-lock.json`, the Constitution hook or one of their gate scripts is staged
+- The rule-layer gates (`check:agents-md`, `check:skills-shape`, `skills:verify`, `check:skills-drift`, `check:skills-references`, `check:skills-headings`, `check:skills-crossrefs`) -- only when `AGENTS.md`, a skill tree, the rule manifest, `skills-lock.json`, the Constitution hook or one of their gate scripts is staged
 - Version drift lint (`check:version`) -- only when `package.json` or `package-lock.json` is staged
 
 A commit that touches none of those paths pays for lint-staged and the scan alone. The gates read the working tree, so stage the whole change; a deleted or renamed gated file triggers its block as well.
@@ -919,7 +919,7 @@ The version check runs in pre-commit.
 
 ## Core Principles (The Constitution)
 
-The Constitution has one home, [`AGENTS.md`](AGENTS.md): 14 MUST, 5 SHOULD and 17 WON'T rules, one line each, with the skill that owns the detail named in the Skills Index. Every harness loads that file (Claude Code through `CLAUDE.md`), every hook message cites a rule by its name there, and `npm run check:skills-drift` proves each rule is anchored in its owning skill. This README does not repeat the rules, so they cannot drift here.
+The Constitution has one home, [`AGENTS.md`](AGENTS.md): 14 MUST, 5 SHOULD and 17 WON'T rules, one line each, with the skill that owns the detail named in the Skills Index. `npm run check:skills-drift` checks that each rule is anchored in its owning skill.
 
 What they amount to:
 
@@ -1018,33 +1018,19 @@ This is why **committing after each verified change** is critical. Each commit i
 
 ## AI Rules Architecture
 
-One orchestrator, one canonical skill tree, one generated copy, one enforcement layer. It works with **Claude Code**, **Codex**, **Cursor** and **GitHub Copilot**.
+One orchestrator, one project skill tree, and a shared enforcement layer for **Codex**, **Cursor** and **GitHub Copilot**.
 
 ### How It Works
 
-- **[`AGENTS.md`](AGENTS.md)** -- always loaded. The Constitution (36 one-line rules), the workflow (proceed, verify, commit) and the Skills Index (17 skills, one read-when line each). Codex, Cursor and Copilot read it natively; Claude Code imports it from `CLAUDE.md`, which adds the Claude-only notes (hooks, protected paths, status line). `npm run check:agents-md` caps it at 100 lines / 800 words and keeps the index equal to the skill directories.
-- **`.claude/skills/<name>/SKILL.md`** -- the canonical skills, at most 100 lines each: a Critical block (the rules), a Procedure (the steps) and References (the long material in `references/`, read on demand). Edit skills here only.
-- **`.agents/skills/`** -- a byte-for-byte copy generated by `npm run skills:sync`. Codex loads skills from this directory; Cursor and VS Code Copilot read both trees (the same skills, listed twice). `npm run check:skills-sync` fails when it differs from the canonical tree, in content or in file modes.
-- **Enforcement** -- the shared scanner checks mechanical rules at pre-commit and PR review time.
-- **[`AI-WORKFLOWS.md`](AI-WORKFLOWS.md)** -- the step map for the common tasks, each step citing its owning skill and step.
-
-### Tool Comparison
-
-| Feature              | Claude Code                          | Codex                                 | Cursor                    | GitHub Copilot                                               |
-| -------------------- | ------------------------------------ | ------------------------------------- | ------------------------- | ------------------------------------------------------------ |
-| Orchestrator         | `CLAUDE.md` imports `AGENTS.md`      | `AGENTS.md`                           | `AGENTS.md`               | `AGENTS.md`                                                  |
-| Skills               | `.claude/skills/`                    | `.agents/skills/`                     | both trees                | both trees                                                   |
-| Skill activation     | on demand, from the index            | on demand, from the index or `$skill` | on demand, from the index | on demand, from the index                                    |
-| Write-time hook      | not configured                      | no                                    | no                        | no                                                           |
-| Scan, pre-commit     | yes                                  | yes                                   | yes                       | yes                                                          |
-| Review-time scan     | `pr-reviewer` skill                  | `pr-reviewer` skill                   | `pr-reviewer` skill       | `pr-reviewer` skill |
-| Browser exploration  | `playwright-cli`                     | `playwright-cli` (see the note)       | `playwright-cli`          | `playwright-cli`                                             |
+- **[`AGENTS.md`](AGENTS.md)** holds the Constitution, workflow and Skills Index. `npm run check:agents-md` checks its size and index.
+- **`.agents/skills/<name>/SKILL.md`** holds the project skills and their on-demand references.
+- **Enforcement** scans mechanical rules at pre-commit and PR review time.
 
 Codex notes: it has no write-time hook, so the scan in pre-commit is its enforcement. On macOS its workspace-write sandbox cannot launch Chromium; run the exploration step with `codex --sandbox danger-full-access` or explore outside Codex first. Without an OpenAI account, `codex exec --oss --local-provider ollama -m gpt-oss:20b` runs the same harness on a local model; start Ollama with `OLLAMA_CONTEXT_LENGTH=131072`.
 
 ### Skills Index
 
-The index is the `## Skills Index` section of [`AGENTS.md`](AGENTS.md): one line per skill, name and read-when. It is not repeated here; `npm run check:agents-md` keeps it equal to the directories under `.claude/skills/`.
+The index is the `## Skills Index` section of [`AGENTS.md`](AGENTS.md): one line per skill, name and read-when. It is not repeated here; `npm run check:agents-md` keeps it equal to the directories under `.agents/skills/`.
 
 ---
 

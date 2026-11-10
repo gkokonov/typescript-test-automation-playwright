@@ -5,12 +5,11 @@
 # by the sibling linters (check-rules-drift.sh validates Constitution rules
 # against Critical blocks; check-skill-references-drift.sh validates
 # references/*.md pointers; check-agents-md.sh keeps the AGENTS.md Skills
-# Index in sync with .claude/skills/). This script catches two failure modes:
+# Index in sync with .agents/skills/). This script catches two failure modes:
 #
 #   1. Frontmatter drift -- SKILL.md frontmatter `name:` does not match its
 #                          directory name, or `description:` is missing/empty.
 #   2. Dangling skill ref -- a backticked kebab-case token in AGENTS.md,
-#                          CLAUDE.md, a SKILL.md or a
 #                          scaffold skill's references/*.md names a skill
 #                          that does not exist (typically left behind by a
 #                          rename/delete).
@@ -29,15 +28,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILLS_DIR="${REPO_ROOT}/.claude/skills"
-# Claude tree pruned at init (--no-claude): lint the generated copy instead.
-[[ -d "${SKILLS_DIR}" ]] || SKILLS_DIR="${REPO_ROOT}/.agents/skills"
+SKILLS_DIR="${REPO_ROOT}/.agents/skills"
 CONSTITUTION="${REPO_ROOT}/AGENTS.md"
 
-if [[ ! -f "${CONSTITUTION}" && ! -d "${REPO_ROOT}/.claude" ]]; then
-    echo "SKIP: Claude rule tree not present (pruned at init) — nothing to check."
-    exit 0
-fi
 
 # Kebab tokens that are legitimate prose, doc examples, or placeholders --
 # not skill names and not repo paths. Extend deliberately when a new
@@ -63,7 +56,7 @@ ALLOWLIST=(
 
 errors=0
 
-# --- Collect skills on disk (dirs under .claude/skills/ that have a SKILL.md) ---
+# --- Collect skills on disk (dirs under .agents/skills/ that have a SKILL.md) ---
 disk_skills=""
 while IFS= read -r skill_md; do
     disk_skills="${disk_skills}$(basename "$(dirname "${skill_md}")")"$'\n'
@@ -159,7 +152,6 @@ vendored_skills="$(node -e "
 is_vendored() { printf '%s\n' "${vendored_skills}" | grep -F -x -q -- "$1"; }
 
 check_tokens_in "${CONSTITUTION}" "AGENTS.md"
-[[ -f "${REPO_ROOT}/CLAUDE.md" ]] && check_tokens_in "${REPO_ROOT}/CLAUDE.md" "CLAUDE.md"
 while IFS= read -r name; do
     [[ -z "${name}" ]] && continue
     check_tokens_in "${SKILLS_DIR}/${name}/SKILL.md" "${name}/SKILL.md"

@@ -1,6 +1,6 @@
 # Constitution rule anchors — shared manifest.
 # Consumed by:
-#   scripts/check-rules-drift.sh          (anchor must be in the .claude skill's Critical block)
+#   scripts/check-rules-drift.sh          (anchor must be in the .agents skill's Critical block)
 # Format: <anchor-token>|<owning-skill-dir>|<short-label>
 # Keep tokens short and DISTINCTIVE — a token that matches incidental text
 # (e.g. a bare `.ts`) is a no-op check: the rule could be deleted from the

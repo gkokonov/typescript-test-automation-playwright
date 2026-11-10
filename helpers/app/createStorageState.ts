@@ -1,7 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { chromium, expect } from '@playwright/test';
-import { ApiEndpoints, StorageStatePaths } from '../../enums/app/app';
+import {
+    ApiEndpoints,
+    runStorageStatePath,
+    StorageStatePaths,
+} from '../../enums/app/app';
 import { AppPage } from '../../pages/app/app.page';
 import { ApiRequestFn } from '../../fixtures/api/api-types';
 import {
@@ -38,7 +42,9 @@ export async function createAppStorageState(): Promise<void> {
         process.env.APP_PASSWORD!
     );
 
-    await context.storageState({ path: StorageStatePaths.APP });
+    await context.storageState({
+        path: runStorageStatePath(StorageStatePaths.APP),
+    });
     await browser.close();
 }
 
@@ -87,13 +93,17 @@ export async function setUserAccessToken(
     expect(status).toBe(200);
     expect(UserResponseSchema.parse(body)).toBeTruthy();
 
-    fs.mkdirSync(path.dirname(StorageStatePaths.API_ACCESS_TOKEN), {
+    const tokenPath = runStorageStatePath(StorageStatePaths.API_ACCESS_TOKEN);
+    const temporaryPath = `${tokenPath}.${process.pid}.tmp`;
+    fs.mkdirSync(path.dirname(tokenPath), {
         recursive: true,
     });
-    fs.writeFileSync(
-        StorageStatePaths.API_ACCESS_TOKEN,
-        JSON.stringify(body, null, 2)
-    );
+    try {
+        fs.writeFileSync(temporaryPath, JSON.stringify(body, null, 2));
+        fs.renameSync(temporaryPath, tokenPath);
+    } finally {
+        fs.rmSync(temporaryPath, { force: true });
+    }
 
     process.env['ACCESS_TOKEN'] = body.access_token;
 }
@@ -103,17 +113,17 @@ export async function setUserAccessToken(
  * `process.env.ACCESS_TOKEN` for the current worker process.
  *
  * Called automatically once per worker by the `apiRequest` fixture file.
- * A missing file is not an error: the `setup-api` project itself, or a run that
- * never minted a token, simply leaves `process.env.ACCESS_TOKEN` unset.
+ * Setup projects do not load the token. A consuming worker fails clearly if
+ * its run's setup did not create the file.
  *
  * @returns {void}
  */
 export function loadUserAccessToken(): void {
-    if (!fs.existsSync(StorageStatePaths.API_ACCESS_TOKEN)) return;
+    const tokenPath = runStorageStatePath(StorageStatePaths.API_ACCESS_TOKEN);
+    if (!fs.existsSync(tokenPath))
+        throw new Error(`API token file missing: ${tokenPath}`);
 
-    const raw: unknown = JSON.parse(
-        fs.readFileSync(StorageStatePaths.API_ACCESS_TOKEN, 'utf-8')
-    );
+    const raw: unknown = JSON.parse(fs.readFileSync(tokenPath, 'utf-8'));
     const { access_token } = UserResponseSchema.parse(raw);
 
     process.env['ACCESS_TOKEN'] = access_token;

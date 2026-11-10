@@ -9,12 +9,14 @@
 
 import * as fs from 'node:fs';
 import { expect, test } from '../../fixtures/pom/test-options';
-import { StorageStatePaths } from '../../enums/app/app';
+import { runStorageStatePath, StorageStatePaths } from '../../enums/app/app';
 import { createAppStorageState } from '../../helpers/app/createStorageState';
 
 test.describe('auth setup - UI', () => {
     test('setup authentication - browser storage state', async () => {
         await createAppStorageState();
-        expect(fs.existsSync(StorageStatePaths.APP)).toBe(true);
+        expect(fs.existsSync(runStorageStatePath(StorageStatePaths.APP))).toBe(
+            true
+        );
     });
 });

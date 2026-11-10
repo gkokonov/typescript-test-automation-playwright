@@ -1,32 +1,7 @@
 #!/usr/bin/env bash
 # sync-upstream-skills.sh
 #
-# Manages the upstream-tracked Anthropic-style skills listed in `skills-lock.json`:
-# `skill-creator` (source: github anthropics/skills) and `playwright-cli` (source:
-# npm @playwright/cli, bundles SKILL.md). Three modes:
-#
-#   verify    -- (default) Re-hash each vendored skill DIRECTORY (every
-#                tracked file under .claude/skills/<name>/: SKILL.md, the
-#                references, the scripts) and exit non-zero if a hash
-#                diverges from `skills-lock.json`. Detects local tampering
-#                between deliberate updates. Part of `npm run check:skills`.
-#
-#   reinstall -- Fetch each upstream SKILL.md, overwrite the vendored copy in
-#                .claude/skills/<name>/SKILL.md and refresh the corresponding
-#                directory hash in `skills-lock.json`. Then run
-#                `npm run skills:sync` so the generated .agents/skills tree
-#                follows (check:skills-sync fails until it does).
-#
-#   update    -- Re-hash the local directories (without fetching upstream) and
-#                write the new hashes into `skills-lock.json`. Use when
-#                intentional local edits to a vendored skill need to be
-#                re-locked.
-#
-# Sources are read from the lock; `sourceType` decides how to fetch:
-#   github  -> https://raw.githubusercontent.com/<source>/<ref|main>/<skillPath>
-#   npm     -> node_modules/<source>/<skillPath>  (npm install must have run)
-#
-# Exit codes: 0 OK, 1 drift / fetch failure, 2 misuse.
+# Verify, reinstall, or update the locked upstream skill in the project skill tree.
 
 set -euo pipefail
 
@@ -44,11 +19,6 @@ case "$MODE" in
         exit 2
         ;;
 esac
-
-if [[ "$MODE" == "verify" && ! -d "${REPO_ROOT}/.claude/skills" ]]; then
-    echo "SKIP: .claude/skills not present (pruned at init) — no vendored skill to verify."
-    exit 0
-fi
 
 if [[ ! -f "$LOCK" ]]; then
     echo "ERROR: $LOCK not found" >&2
@@ -94,7 +64,7 @@ write_hash() {
 }
 
 sha256() {
-    shasum -a 256 "$1" | awk '{print $1}'
+    sha256sum "$1" | awk '{print $1}'
 }
 
 # Hash of a vendored skill directory: every git-tracked file under it
@@ -112,8 +82,8 @@ tree_hash() {
     fi
     printf '%s\n' "${list}" | LC_ALL=C sort | while IFS= read -r f; do
         [[ -z "${f}" ]] && continue
-        printf '%s\t%s\n' "${f}" "$(shasum -a 256 "${REPO_ROOT}/${f}" 2>/dev/null | awk '{print $1}')"
-    done | shasum -a 256 | awk '{print $1}'
+        printf '%s\t%s\n' "${f}" "$(sha256sum "${REPO_ROOT}/${f}" 2>/dev/null | awk '{print $1}')"
+    done | sha256sum | awk '{print $1}'
 }
 
 fetch_upstream() {
@@ -149,17 +119,16 @@ fetch_upstream() {
 errors=0
 processed=0
 
-# .claude is the canonical tree; .agents/skills is generated from it by sync-skills.sh.
 LOCAL_TREES=(
-    "${REPO_ROOT}/.claude/skills"
+    "${REPO_ROOT}/.agents/skills"
 )
 
 while IFS=$'\t' read -r name source_type source ref skill_path expected_hash; do
     [[ -z "$name" ]] && continue
     processed=$((processed + 1))
 
-    canonical="${REPO_ROOT}/.claude/skills/${name}/SKILL.md"
-    skill_dir="${REPO_ROOT}/.claude/skills/${name}"
+    canonical="${REPO_ROOT}/.agents/skills/${name}/SKILL.md"
+    skill_dir="${REPO_ROOT}/.agents/skills/${name}"
 
     case "$MODE" in
         verify)
@@ -215,7 +184,4 @@ done < <(list_skills)
 
 echo
 echo "Mode: ${MODE}; Processed ${processed} skill(s); ${errors} issue(s)."
-if [[ "$MODE" == "reinstall" && "$errors" -eq 0 ]]; then
-    echo "NEXT  run 'npm run skills:sync' to regenerate .agents/skills from the canonical tree."
-fi
 [[ "$errors" -eq 0 ]] || exit 1

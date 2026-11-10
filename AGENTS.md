@@ -59,7 +59,7 @@ Rules for every agent in this repository. Skills hold the detail; load the one t
 
 ## Skills Index
 
-Your harness loads skills from its native directory. Claude Code uses `.claude/skills/`, Codex, Cursor and Copilot use `.agents/skills/`.
+Codex, Cursor and Copilot load project skills from `.agents/skills/`.
 
 - `ai-native-workflow`: first on any non-trivial task.
 - `playwright-cli`: exploring the live app before any UI code.

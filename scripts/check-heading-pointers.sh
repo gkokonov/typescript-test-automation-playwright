@@ -4,7 +4,7 @@
 #
 # Skills cross-reference each other's sections as `... SKILL.md` → "Heading"
 # or `the \`x\` skill → "Heading"`, and each other's Procedure steps as
-# `\`api-testing\` step 5`, `\`type-safety\` · steps 2–3` (AI-WORKFLOWS.md) or
+# `\`api-testing\` step 5`, `\`type-safety\` · steps 2–3` or
 # `step 7 of \`api-testing\``. Renaming a heading or renumbering a Procedure
 # silently strands every pointer (this class of bug shipped once: three
 # files pointed at a selectors heading that had been renamed).
@@ -34,10 +34,7 @@ import re
 import sys
 
 root = sys.argv[1]
-skills_dir = os.path.join(root, ".claude", "skills")
-# Claude tree pruned at init (--no-claude): lint the generated copy instead.
-if not os.path.isdir(skills_dir):
-    skills_dir = os.path.join(root, ".agents", "skills")
+skills_dir = os.path.join(root, ".agents", "skills")
 if not os.path.isdir(skills_dir):
     print("SKIP: no skill tree present (pruned at init) — nothing to check.")
     sys.exit(0)
@@ -47,7 +44,7 @@ EXPLICIT = re.compile(r"skills/([a-z0-9-]+)/SKILL\.md")
 # Backtick and bold mention forms — `x` skill / **x** skill — plus a bare
 # backtick mention (`x` →) directly before the pointer arrow.
 SKILL_MENTION = re.compile(r"[`*]{1,2}([a-z0-9-]+)[`*]{1,2} skill|`([a-z0-9-]+)`\s*→")
-REF_MENTION = re.compile(r"`(?:\.claude/skills/[a-z0-9-]+/)?(references/[A-Za-z0-9._-]+\.md)`")
+REF_MENTION = re.compile(r"`(?:\.agents/skills/[a-z0-9-]+/)?(references/[A-Za-z0-9._-]+\.md)`")
 
 def headings(path):
     try:
@@ -79,8 +76,6 @@ def procedure_steps(skill):
 file_headings = {}
 md_files = [
     os.path.join(root, "AGENTS.md"),
-    os.path.join(root, "CLAUDE.md"),
-    os.path.join(root, "AI-WORKFLOWS.md"),
 ]
 for dirpath, dirnames, filenames in os.walk(skills_dir):
     dirnames[:] = [d for d in dirnames if not d.endswith("-workspace")]

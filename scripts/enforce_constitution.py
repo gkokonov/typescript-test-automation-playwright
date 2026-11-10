@@ -25,7 +25,7 @@ Rule ids are marked with `# hook-rule-id` comments — scripts/check-rules-drift
 and scripts/check-hook-eslint-parity.sh extract them from those markers, so a
 new rule without a marker fails the tuple-count cross-check.
 
-Contract (Claude Code hooks):
+Hook input contract:
   stdin  -- JSON payload: {"tool_name": ..., "tool_input": {...}}
   exit 0 -- allow the tool call
   exit 2 -- block the tool call; stderr is fed back to the agent
@@ -40,17 +40,8 @@ from collections import Counter
 
 
 def _project_root() -> str:
-    """Repo root, independent of the CWD the hook was launched from.
-
-    Claude Code sets CLAUDE_PROJECT_DIR for hook commands; when absent
-    (scan mode, manual runs) fall back to this script's location —
-    scripts/ is one level below the repo root.
-    """
-    env_root = os.environ.get("CLAUDE_PROJECT_DIR", "")
-    if env_root and os.path.isdir(env_root):
-        return env_root
+    """Return the repository root from this script's location."""
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 
 PROJECT_ROOT = _project_root()
 
@@ -248,10 +239,7 @@ RAW_CONTENT_RULES = {"no-eslint-disable-scaffold"}
 # blocks it (the Bash write-guard blocks the shell side of the same hole).
 # Humans edit these files normally; hooks only run on agent tool calls.
 PROTECTED_PATH = re.compile(
-    # Unanchored on the left: a nested copy (a git worktree under
-    # .claude/worktrees/, a scaffolded project inside this one) is the same
-    # hole one level down.
-    r"(?:^|/)(?:\.claude/scripts/|\.claude/settings(?:\.local)?\.json$|\.playwright-cli/)",
+    r"(?:^|/)\.playwright-cli/",
     re.I,
 )
 
@@ -492,7 +480,7 @@ def read_existing(rel_path: str) -> "str | None":
 
 
 def apply_edits(text: str, edits: "list[dict]") -> "str | None":
-    """Apply Edit/MultiEdit replacements in memory (Claude Code semantics:
+    """Apply Edit/MultiEdit replacements in memory (tool semantics:
     first occurrence, or every occurrence with replace_all). None when one
     cannot apply: the tool call itself would fail, or the shape is unknown."""
     for edit in edits:
@@ -643,8 +631,7 @@ def hook() -> int:
     if PROTECTED_PATH.search(rel_path):
         print(
             f"BLOCKED by Constitution enforcement hook ({rel_path}):\n"
-            "  - [protected-path] Enforcement infrastructure (.claude/scripts/, "
-            ".claude/settings.json, .claude/settings.local.json, .playwright-cli/) "
+            "  - [protected-path] Exploration evidence (.playwright-cli/) "
             "is not agent-writable — an agent must not rewrite its own gates, "
             "switch hooks off or forge exploration evidence. Changes here belong "
             "to the human: describe the change and ask them to apply it.",
@@ -691,7 +678,7 @@ if __name__ == "__main__":
     # (a bare traceback exits 1, which PreToolUse treats as non-blocking —
     # the exact fail-open hole this layer exists to remove). A malformed
     # payload is handled separately inside hook() and stays fail-open, because
-    # that is Claude Code hook-infra noise, not the agent's change.
+    # that is hook infrastructure noise, not the agent's change.
     #
     # This guard only reaches crashes AFTER module import; a module-level
     # syntax error or a missing python3 exits 1/127 before it runs. Those are

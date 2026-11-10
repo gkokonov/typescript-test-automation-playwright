@@ -19,8 +19,10 @@ type ApiWorkerFixtures = {
 
 export const test = base.extend<ApiRequestMethods, ApiWorkerFixtures>({
     accessTokenLoaded: [
-        async ({}, use): Promise<void> => {
-            loadUserAccessToken();
+        async ({}, use, workerInfo): Promise<void> => {
+            if (!['setup-api', 'setup-ui'].includes(workerInfo.project.name)) {
+                loadUserAccessToken();
+            }
             await use();
         },
         { scope: 'worker', auto: true },
@@ -30,8 +32,8 @@ export const test = base.extend<ApiRequestMethods, ApiWorkerFixtures>({
      * Provides a function to make API requests.
      * Uses the Playwright request context for HTTP calls.
      *
-     * @param {object} request - The request object.
-     * @param {function} use - The use function to provide the API request function.
+     * @param request - The request object.
+     * @param use - The use function to provide the API request function.
      */
     apiRequest: async ({ request }, use) => {
         const apiRequestFn: ApiRequestFn = async <T = unknown>({

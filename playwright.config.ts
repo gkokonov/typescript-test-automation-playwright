@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
-import { StorageStatePaths } from './enums/app/app';
+import { randomUUID } from 'node:crypto';
+import { runStorageStatePath, StorageStatePaths } from './enums/app/app';
 
 /**
  * Load environment variables from .env file.
@@ -14,6 +15,7 @@ const environmentPath = `./env/.env.${environment}`;
 
 // quiet: dotenv v17+ prints promotional "injected env" banners by default
 dotenv.config({ path: environmentPath, quiet: true });
+process.env.PLAYWRIGHT_AUTH_RUN_ID ??= randomUUID();
 
 /**
  * Playwright Test Configuration
@@ -21,6 +23,7 @@ dotenv.config({ path: environmentPath, quiet: true });
  */
 export default defineConfig({
     testDir: './tests',
+    globalTeardown: './helpers/app/cleanupAuthState.ts',
 
     /* Run tests in files in parallel */
     fullyParallel: true,
@@ -105,7 +108,7 @@ export default defineConfig({
             testIgnore: /.*\/api\/.*\.spec\.ts/,
             use: {
                 ...devices['Desktop Chrome'],
-                storageState: StorageStatePaths.APP,
+                storageState: runStorageStatePath(StorageStatePaths.APP),
                 viewport: { width: 1920, height: 1080 },
             },
             dependencies: ['setup-api', 'setup-ui'],

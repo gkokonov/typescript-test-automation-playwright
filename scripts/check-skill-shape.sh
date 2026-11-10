@@ -16,8 +16,6 @@
 #   code fences     <= 6 lines each (longer examples go to references/).
 #   references/*.md <= 150 lines, <= 1,000 words each.
 #   wording         harness-neutral: no PreToolUse/PostToolUse, settings.json,
-#                   .claude/ path, CLAUDE.md or "the enforcement hook blocks"
-#                   talk (that belongs to the Claude Code block of CLAUDE.md).
 #   all skills      <= 1,500 lines, <= 9,000 words together.
 #
 # Exit 0 = every cap holds, 1 = a cap is exceeded, 2 = cannot run.
@@ -25,7 +23,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILLS_DIR="${REPO_ROOT}/.claude/skills"
+SKILLS_DIR="${REPO_ROOT}/.agents/skills"
 
 if [[ ! -d "${SKILLS_DIR}" ]]; then
     echo "SKIP: ${SKILLS_DIR#"${REPO_ROOT}"/} not present (pruned at init) — nothing to check."
@@ -39,7 +37,7 @@ import re
 import sys
 
 root = sys.argv[1]
-skills_dir = os.path.join(root, ".claude", "skills")
+skills_dir = os.path.join(root, ".agents", "skills")
 
 CAPS = {
     "skill_lines": 100,
@@ -57,7 +55,7 @@ CAPS = {
 HEADINGS = ["## Critical", "## Procedure", "## References"]
 # Playwright's afterEach/afterAll are hooks too, so "hook" alone is not a hit.
 HARNESS = re.compile(
-    r"PreToolUse|PostToolUse|settings\.json|\.claude/|CLAUDE\.md|enforcement hook|hook (?:will )?(?:block|refuse|reject)",
+    r"PreToolUse|PostToolUse|settings\.json|enforcement hook|hook (?:will )?(?:block|refuse|reject)",
 )
 
 try:

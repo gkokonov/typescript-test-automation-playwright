@@ -79,17 +79,14 @@ export async function apiRequest({
     let bodyData: unknown = null;
     const contentType = response.headers()['content-type'] || '';
 
-    try {
-        if (contentType.includes('application/json')) {
-            bodyData = await response.json();
-        } else if (contentType.includes('text/')) {
-            bodyData = await response.text();
-        }
-    } catch (err) {
-        // eslint-disable-next-line no-console -- Important to log parsing failures for debugging
-        console.warn(
-            `Failed to parse response body for status ${status}: ${err}`
-        );
+    if (
+        status !== 204 &&
+        status !== 205 &&
+        contentType.includes('application/json')
+    ) {
+        bodyData = await response.json();
+    } else if (contentType.includes('text/')) {
+        bodyData = await response.text();
     }
 
     return { status, body: bodyData };

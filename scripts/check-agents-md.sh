@@ -1,47 +1,13 @@
 #!/usr/bin/env bash
-# check-agents-md.sh — AGENTS.md stays small, import-safe and in sync;
-# CLAUDE.md stays in step with it.
-#
-# AGENTS.md is the always-loaded orchestrator for every harness (Claude Code
-# imports it from CLAUDE.md; Codex, Cursor and Copilot read it natively).
-# This gate fails when:
-#
-#   1. Budget   -- the file exceeds MAX_LINES or MAX_WORDS (`wc -l` / `wc -w`;
-#                  the PRO block counts, it is loaded too).
-#   2. Bare `@` -- an `@` appears outside a code span or fenced block. Claude
-#                  Code parses a bare `@path` in an imported file as another
-#                  import, so `@smoke` or `@playwright/test` in prose must be
-#                  written as code spans.
-#   3. Index    -- the "## Skills Index" names do not match the skill
-#                  directories under .claude/skills/ (both directions), after
-#                  removing EXCLUDED_SKILLS. Every `pro-*` index line must sit
-#                  inside a PRO block so the OSS export strips it.
-#   4. Shape    -- a required heading is missing (the other drift gates key on
-#                  them), or the <!-- PRO:START --> / <!-- PRO:END --> markers
-#                  are unbalanced or nested.
-#   5. CLAUDE.md -- the Claude Code importer stays within CLAUDE_MAX_LINES /
-#                  CLAUDE_MAX_WORDS, its only bare `@` line is `@AGENTS.md`
-#                  (anything else would be a second import), it carries the
-#                  "## Claude Code only" heading, and its PRO markers balance.
-#                  Skipped when CLAUDE.md is absent (pruned at init).
-#
-# Exits non-zero on any failure so pre-commit can gate.
-
+# Validate the project instructions and skill index.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 AGENTS="${REPO_ROOT}/AGENTS.md"
-CLAUDE="${REPO_ROOT}/CLAUDE.md"
-SKILLS_DIR="${REPO_ROOT}/.claude/skills"
-# Claude tree pruned at init (--no-claude): lint the generated copy instead.
-[[ -d "${SKILLS_DIR}" ]] || SKILLS_DIR="${REPO_ROOT}/.agents/skills"
+SKILLS_DIR="${REPO_ROOT}/.agents/skills"
 
 MAX_LINES=100
 MAX_WORDS=800
-CLAUDE_MAX_LINES=30
-CLAUDE_MAX_WORDS=250
-CLAUDE_IMPORT="@AGENTS.md"
-CLAUDE_HEADING="## Claude Code only"
 
 # Skill directories deliberately absent from the index. Empty by default:
 # vendored skills (playwright-cli, skill-creator) are indexed because the
@@ -106,7 +72,7 @@ else
     checked=$((checked + 1))
 fi
 
-# ---- 3. Skills Index <-> .claude/skills ------------------------------------
+# ---- 3. Skills Index <-> .agents/skills ------------------------------------
 index_section="$(awk '
     /^## Skills Index/ { in_sec = 1; next }
     in_sec && /^## /   { in_sec = 0 }
@@ -188,59 +154,6 @@ else
     errors=$((errors + 1))
 fi
 
-# ---- 5. CLAUDE.md: the importer -------------------------------------------
-claude_summary=""
-if [[ -f "${CLAUDE}" ]]; then
-    c_lines="$(wc -l < "${CLAUDE}" | tr -d ' ')"
-    c_words="$(wc -w < "${CLAUDE}" | tr -d ' ')"
-    claude_summary=" CLAUDE.md: ${c_lines}/${CLAUDE_MAX_LINES} lines, ${c_words}/${CLAUDE_MAX_WORDS} words."
-    if [[ "${c_lines}" -gt "${CLAUDE_MAX_LINES}" ]]; then
-        echo "BUDGET CLAUDE.md :: ${c_lines} lines, cap ${CLAUDE_MAX_LINES}"
-        errors=$((errors + 1))
-    else
-        checked=$((checked + 1))
-    fi
-    if [[ "${c_words}" -gt "${CLAUDE_MAX_WORDS}" ]]; then
-        echo "BUDGET CLAUDE.md :: ${c_words} words, cap ${CLAUDE_MAX_WORDS}"
-        errors=$((errors + 1))
-    else
-        checked=$((checked + 1))
-    fi
-    # Every line with an `@` outside a code span is an import; exactly one is
-    # allowed and it is the orchestrator.
-    c_imports="$(awk '
-        /^```/ { fence = !fence; next }
-        fence  { next }
-        {
-            line = $0
-            gsub(/`[^`]*`/, "", line)
-            if (index(line, "@") > 0) print NR ": " $0
-        }
-    ' "${CLAUDE}")"
-    if [[ "${c_imports}" == "1: ${CLAUDE_IMPORT}" ]]; then
-        checked=$((checked + 1))
-    else
-        echo "IMPORT CLAUDE.md :: expected line 1 to be the only bare-@ line (${CLAUDE_IMPORT}); found:"
-        printf '%s\n' "${c_imports:-<none>}" | sed 's/^/  /'
-        errors=$((errors + 1))
-    fi
-    if grep -F -x -q -- "${CLAUDE_HEADING}" "${CLAUDE}"; then
-        checked=$((checked + 1))
-    else
-        echo "SHAPE CLAUDE.md :: required heading '${CLAUDE_HEADING}' missing"
-        errors=$((errors + 1))
-    fi
-    state="$(marker_state "${CLAUDE}")"
-    if [[ "${state}" == "ok" ]]; then
-        checked=$((checked + 1))
-    else
-        while IFS= read -r msg; do
-            echo "SHAPE CLAUDE.md :: ${msg}"
-        done <<< "${state}"
-        errors=$((errors + 1))
-    fi
-fi
-
 echo
-echo "AGENTS.md: ${lines}/${MAX_LINES} lines, ${words}/${MAX_WORDS} words.${claude_summary} Checked ${checked} point(s); ${errors} failure(s)."
+ echo "AGENTS.md: ${lines}/${MAX_LINES} lines, ${words}/${MAX_WORDS} words. Checked ${checked} point(s); ${errors} failure(s)."
 [[ "${errors}" -eq 0 ]] || exit 1

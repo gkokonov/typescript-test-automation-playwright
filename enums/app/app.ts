@@ -39,3 +39,17 @@ export enum StorageStatePaths {
     APP = '.auth/app/appStorageState.json',
     API_ACCESS_TOKEN = '.auth/app/apiAccessToken.json',
 }
+
+/** Resolve an auth state file inside this Playwright invocation's directory. */
+export function runStorageStatePath(statePath: StorageStatePaths): string {
+    const runId = process.env.PLAYWRIGHT_AUTH_RUN_ID;
+    if (
+        !runId ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            runId
+        )
+    ) {
+        throw new Error('PLAYWRIGHT_AUTH_RUN_ID must be a valid UUID v4');
+    }
+    return statePath.replace('.auth/app/', `.auth/app/${runId}/`);
+}
