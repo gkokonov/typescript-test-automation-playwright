@@ -84,7 +84,7 @@ playwright-cli --version
 
 Expected output (exact versions vary with your installed packages):
 
-```
+```text
 playwright --version      → Version 1.64.1
 playwright-cli --version  → 0.1.23
 ```
@@ -683,7 +683,7 @@ The scaffold follows a **three-tier rule** (see the `data-strategy` skill):
 2. **Domain-specific curated invalid sets** (invalid email formats, weak passwords, forbidden enum values, locale strings, etc.) live under `test-data/static/{area}/*.ts` -- this is where new static files usually go.
 3. **Field-specific boundary / range values** (e.g., out-of-range for a `1..5` number) may stay inline in the spec file when used in exactly one place.
 
-```
+```text
 test-data/static/
 ├── util/
 │   └── invalid-values.ts       # Universal type-mismatch tuples (as const)
@@ -712,7 +712,7 @@ for (const { description, email, password } of INVALID_LOGIN_ATTEMPTS) {
 
 TypeScript factory functions using **Faker + Zod** for generating unique, valid data per test run. This prevents data collision in parallel execution.
 
-```
+```text
 test-data/factories/
 └── app/
     └── user.factory.ts  # generateUser(), generateLoginCredentials()
@@ -939,7 +939,7 @@ This framework is optimized for AI-assisted test development. Follow this workfl
 
 ### The Golden Rule: Verify -> Commit -> Proceed
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         AI-ASSISTED DEVELOPMENT CYCLE                       │
 │                                                                             │
@@ -1038,7 +1038,7 @@ The index is the `## Skills Index` section of [`AGENTS.md`](AGENTS.md): one line
 
 The framework uses a layered fixture composition pattern that provides clean separation of concerns:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         test-options.ts                                 │
 │                    (Single Import Point for Tests)                      │
